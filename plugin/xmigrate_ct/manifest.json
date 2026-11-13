@@ -1,0 +1,10 @@
+{
+    "id": "xmigrate_ct",
+    "name": "XMigrate CT (privileged)",
+    "version": "1.1.0",
+    "author": "Proxmox Migrate project",
+    "description": "Migrazione cross-cluster di container LXC (anche privilegiati) via backup/restore come root, usando xmigrate-ct.sh. Esegue lo script sul server PegaProx (richiede SSH root verso i nodi).",
+    "min_pegaprox": "1.4.0",
+    "has_frontend": true,
+    "frontend_route": "ui"
+}

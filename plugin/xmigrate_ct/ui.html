@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XMigrate CT</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --field: #0d1117; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #2f81f7; --accent-text: #fff;
+    --ok: #3fb950; --err: #f85149; --warn: #d29922;
+    --log-bg: #0b0f14; --log-text: #d1d7e0;
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f8fa; --panel: #ffffff; --field: #ffffff; --border: #d0d7de;
+    --text: #1f2328; --muted: #656d76; --accent: #0969da; --accent-text: #fff;
+    --ok: #1a7f37; --err: #cf222e; --warn: #9a6700;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: 16px 20px 28px; }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .grid { display: grid; grid-template-columns: minmax(320px, 440px) 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin: 10px 0 3px; }
+  label small { font-weight: 400; color: var(--muted); }
+  input[type=text], input[type=password], select {
+    width: 100%; padding: 7px 9px; background: var(--field); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; font: inherit; }
+  input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .check { display: flex; gap: 8px; align-items: flex-start; margin: 9px 0 0; font-weight: 400; }
+  .check input { margin-top: 3px; }
+  .check b { font-weight: 600; }
+  button { font: inherit; cursor: pointer; border-radius: 6px; padding: 8px 14px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button.danger { background: var(--err); border-color: var(--err); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+  .msg { margin-top: 10px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); display: none; white-space: pre-wrap; }
+  .msg.show { display: block; }
+  .msg.err { border-color: var(--err); color: var(--err); }
+  .msg.ok { border-color: var(--ok); color: var(--ok); }
+  .note { border-left: 3px solid var(--warn); padding: 6px 10px; color: var(--muted); font-size: 12.5px; margin-top: 12px; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); }
+  .badge.running { color: var(--warn); border-color: var(--warn); }
+  .badge.done { color: var(--ok); border-color: var(--ok); }
+  .badge.failed { color: var(--err); border-color: var(--err); }
+  .meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; color: var(--muted); }
+  pre#log { margin: 0; background: var(--log-bg); color: var(--log-text); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; min-height: 280px; max-height: 58vh; overflow: auto; font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre-wrap; word-break: break-word; }
+  pre#log .b { font-weight: 700; } pre#log .red { color: #ff7b72; } pre#log .grn { color: #56d364; }
+  pre#log .ylw { color: #e3b341; } pre#log .blu { color: #79c0ff; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  th { color: var(--muted); font-weight: 600; }
+  tr.job { cursor: pointer; } tr.job:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  tr.job.sel { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  textarea { width: 100%; min-height: 70px; background: var(--field); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 9px; font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
+  details > summary { cursor: pointer; font-weight: 600; }
+  fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 2px 12px 12px; margin: 12px 0 0; }
+  legend { font-weight: 700; padding: 0 6px; }
+  button.link { border: 0; background: none; padding: 6px 0 0; color: var(--accent); font-size: 12.5px; text-decoration: underline; }
+  .warnText { color: var(--warn); }
+  .msg.warn { border-color: var(--warn); color: var(--warn); }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<h1>XMigrate CT</h1>
+<p class="sub">Migrazione di container LXC tra cluster (anche privilegiati) via backup/restore come root. Lo script gira sul server PegaProx e si collega ai nodi in SSH.</p>
+
+<div class="grid">
+  <div>
+    <form id="form" class="panel" autocomplete="off">
+      <h2>Migrazione</h2>
+      <div id="banner" class="msg" role="alert"></div>
+
+      <fieldset id="srcSet">
+        <legend>Origine</legend>
+        <div id="srcDrop">
+          <label for="src_cluster">Cluster</label>
+          <select id="src_cluster"><option value="">Carico i cluster...</option></select>
+          <label for="src_node">Nodo</label>
+          <select id="src_node"><option value="">— scegli prima il cluster —</option></select>
+          <div class="hint" id="src_ip"></div>
+          <label for="vmid_sel">Container (LXC)</label>
+          <select id="vmid_sel"><option value="">— scegli prima il nodo —</option></select>
+          <div class="hint" id="vm_hint"></div>
+        </div>
+        <div id="srcMan" hidden>
+          <label for="src">Nodo <small>(IP o hostname; utente root se omesso)</small></label>
+          <input type="text" id="src" placeholder="es. 192.168.1.10">
+          <label for="vmid">VMID del CT</label>
+          <input type="text" id="vmid" inputmode="numeric" placeholder="es. 705">
+        </div>
+        <button type="button" class="link" id="srcToggle">Inserisci a mano</button>
+      </fieldset>
+
+      <fieldset id="dstSet">
+        <legend>Destinazione</legend>
+        <div id="dstDrop">
+          <label for="dst_cluster">Cluster <small>(diverso da quello di origine)</small></label>
+          <select id="dst_cluster"><option value="">Carico i cluster...</option></select>
+          <label for="dst_node">Nodo</label>
+          <select id="dst_node"><option value="">— scegli prima il cluster —</option></select>
+          <div class="hint" id="dst_ip"></div>
+        </div>
+        <div id="dstMan" hidden>
+          <label for="dst">Nodo <small>(IP o hostname; utente root se omesso)</small></label>
+          <input type="text" id="dst" placeholder="es. pve01.example.lan">
+        </div>
+        <button type="button" class="link" id="dstToggle">Inserisci a mano</button>
+        <label for="target_vmid">VMID sulla destinazione <small>(vuoto = uguale all'origine)</small></label>
+        <input type="text" id="target_vmid" inputmode="numeric" placeholder="uguale all'origine">
+        <div class="hint warnText" id="dst_hint"></div>
+      </fieldset>
+
+      <label for="mode">Modalità di backup</label>
+      <select id="mode">
+        <option value="auto">auto: PBS se in comune, altrimenti locale</option>
+        <option value="local">local: backup su storage locale</option>
+        <option value="pbs">pbs: solo PBS (errore se non in comune)</option>
+      </select>
+      <div class="row2">
+        <div><label for="dst_storage">Storage destinazione</label><input type="text" id="dst_storage" placeholder="es. local-lvm"></div>
+        <div><label for="staging">Storage di staging</label><input type="text" id="staging" placeholder="local"></div>
+      </div>
+      <div class="hint">Storage destinazione vuoto: si usa quello del CT d'origine se esiste anche sulla destinazione; se la destinazione ne ha più d'uno e quello non c'è, va indicato. Senza un terminale lo script non può chiederlo.</div>
+      <label for="identity">Chiave SSH <small>(percorso sul server PegaProx)</small></label>
+      <input type="text" id="identity" placeholder="vuoto = chiave gestita dal plugin">
+
+      <label class="check"><input type="checkbox" id="dry_run" checked><span><b>Solo simulazione (dry-run)</b><br><span class="hint">Controlla nodi, storage e PBS e mostra il piano, senza modificare nulla. Togli la spunta per migrare davvero.</span></span></label>
+      <label class="check"><input type="checkbox" id="no_start"><span><b>Non avviare il CT sulla destinazione</b></span></label>
+      <label class="check"><input type="checkbox" id="destroy_src"><span><b>Elimina il CT sull'origine dopo la migrazione</b><br><span class="hint">Solo se il CT sulla destinazione si è avviato ed è acceso (ricontrollato dopo qualche secondo); altrimenti l'origine resta e viene marcata come migrata. Non è disponibile con «Non avviare il CT sulla destinazione» né se il CT è spento in origine. Il backup (PBS o archivio locale) resta come rete di sicurezza.</span><br><span class="hint warnText" id="destroy_hint"></span></span></label>
+      <label class="check"><input type="checkbox" id="cleanup_src"><span><b>Elimina l'archivio temporaneo di backup sull'origine</b><br><span class="hint">Riguarda solo il file di backup (modalità local). Il CT sull'origine NON viene eliminato.</span></span></label>
+
+      <div class="note" id="endNote"></div>
+
+      <div class="actions">
+        <button type="submit" id="go" class="primary">Simula</button>
+        <span class="hint" id="goHint"></span>
+      </div>
+      <div id="formMsg" class="msg" role="alert"></div>
+    </form>
+
+    <div class="panel">
+      <details id="sshBox">
+        <summary>Chiave SSH del plugin</summary>
+        <p class="hint">Il plugin usa una chiave propria. La chiave pubblica deve essere in <code>~/.ssh/authorized_keys</code> di root su entrambi i nodi.</p>
+        <button type="button" id="showKey">Mostra chiave pubblica</button>
+        <textarea id="pubkey" readonly hidden></textarea>
+        <div id="copyRow" class="actions" hidden><button type="button" id="copyKey">Copia</button></div>
+        <h2 style="margin-top:16px">Installa la chiave su un nodo</h2>
+        <div class="row2">
+          <div><label for="ik_host">Nodo</label><input type="text" id="ik_host" placeholder="IP o hostname"></div>
+          <div><label for="ik_user">Utente</label><input type="text" id="ik_user" value="root"></div>
+        </div>
+        <label for="ik_pw">Password <small>(usata una volta, non viene salvata)</small></label>
+        <input type="password" id="ik_pw" autocomplete="new-password">
+        <div class="actions"><button type="button" id="ik_go">Installa chiave</button></div>
+        <div id="sshMsg" class="msg" role="alert"></div>
+      </details>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>Esecuzione</h2>
+      <div class="meta" id="meta"><span>Nessun lavoro selezionato</span></div>
+      <pre id="log" aria-live="polite">Il log compare qui.</pre>
+    </div>
+    <div class="panel">
+      <h2>Lavori <span class="hint">(dall'ultimo avvio di PegaProx)</span></h2>
+      <table>
+        <thead><tr><th>ID</th><th>Stato</th><th>Utente</th><th>Avvio</th><th>Fine</th><th>Codice</th></tr></thead>
+        <tbody id="jobs"><tr><td colspan="6" class="hint">Nessun lavoro.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---- tema (PegaProx passa ?theme=modern-dark|corp-dark|corp-light&cluster=...)
+  var qs = new URLSearchParams(location.search);
+  if ((qs.get('theme') || '').indexOf('light') !== -1) document.documentElement.setAttribute('data-theme', 'light');
+
+  // ---- helper
+  var BASE = location.pathname.replace(/\/ui\/?$/, '/');
+  if (BASE === location.pathname) BASE = '/api/plugins/xmigrate_ct/api/';
+  var $ = function (id) { return document.getElementById(id); };
+  var POLL_MS = 1500, LIST_MS = 5000;
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // lo script colora il log con sequenze ANSI: le trasformo in <span>, il resto del testo e' escapato
+  function ansiToHtml(text) {
+    var open = false;
+    var out = escapeHtml(text).replace(/\u001b\[([0-9;]*)m/g, function (m, codes) {
+      var parts = codes === '' ? ['0'] : codes.split(';');
+      var html = open ? '</span>' : '';
+      open = false;
+      var cls = [];
+      parts.forEach(function (c) {
+        if (c === '1') cls.push('b'); else if (c === '31') cls.push('red'); else if (c === '32') cls.push('grn');
+        else if (c === '33') cls.push('ylw'); else if (c === '34') cls.push('blu');
+      });
+      if (cls.length) { open = true; html += '<span class="' + cls.join(' ') + '">'; }
+      return html;
+    });
+    if (open) out += '</span>';
+    return out.replace(/\u001b\[[0-9;?]*[A-Za-z]/g, '');   // altre sequenze (cursore ecc.)
+  }
+
+  // il backend fa .strip() sulle stringhe: i valori numerici vanno inviati come stringhe
+  function buildPayload(v) {
+    function s(x) { return String(x == null ? '' : x).trim(); }
+    return {
+      src: s(v.src), dst: s(v.dst), vmid: s(v.vmid), target_vmid: s(v.target_vmid),
+      mode: s(v.mode) || 'auto', staging: s(v.staging), dst_storage: s(v.dst_storage), identity: s(v.identity),
+      dry_run: !!v.dry_run, no_start: !!v.no_start, cleanup_src: !!v.cleanup_src,
+      destroy_src: !!v.destroy_src
+    };
+  }
+
+  function validate(p) {
+    if (!p.src || !p.dst || !p.vmid) return 'Origine, destinazione e VMID sono obbligatori.';
+    var bad = ['src', 'dst', 'staging', 'dst_storage', 'identity'].filter(function (k) {
+      return p[k] && (/^-/.test(p[k]) || /\s/.test(p[k]));
+    });
+    if (bad.length) return 'Valori non validi (spazi o "-" iniziale): ' + bad.join(', ');
+    if (!/^\d+$/.test(p.vmid)) return 'Il VMID deve essere un numero.';
+    if (p.target_vmid && !/^\d+$/.test(p.target_vmid)) return 'Il VMID di destinazione deve essere un numero.';
+    if (p.src === p.dst) return 'Origine e destinazione coincidono.';
+    if (p.destroy_src && p.no_start) return 'Per eliminare l\'origine il CT deve essere avviato sulla destinazione: togli «Non avviare».';
+    return '';
+  }
+
+  function api(path, body) {
+    var opts = { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } };
+    if (body !== undefined) {
+      opts.method = 'POST';
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(BASE + path, opts).then(function (r) {
+      return r.text().then(function (t) {
+        var data = null;
+        try { data = JSON.parse(t); } catch (e) { /* non JSON */ }
+        if (!r.ok || (data && data.ok === false)) {
+          var msg = (data && (data.error || data.message)) || ('HTTP ' + r.status);
+          var code = data && data.code;
+          if ((r.status === 401 || r.status === 403) && code !== 'MISSING_PERMISSION') msg += ' (sessione scaduta o permesso plugins.view mancante?)';
+          var err = new Error(msg);
+          err.status = r.status; err.code = code;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
+
+  function show(el, text, kind) {
+    el.className = 'msg' + (text ? ' show ' + (kind || '') : '');
+    el.textContent = text || '';
+  }
+
+  // ---- memoria dei campi (solo comodita': se lo storage non c'e' non succede nulla)
+  // storage e staging non si ricordano: dipendono dai nodi scelti e un valore vecchio darebbe un errore
+  var KEEP = ['src', 'dst', 'mode', 'identity'];
+  function loadKept() {
+    try { KEEP.forEach(function (k) { var v = localStorage.getItem('xm_' + k); if (v != null) $(k).value = v; }); } catch (e) { /* ignora */ }
+  }
+  function saveKept() {
+    try { KEEP.forEach(function (k) { localStorage.setItem('xm_' + k, $(k).value); }); } catch (e) { /* ignora */ }
+  }
+
+  function values() {
+    return {
+      src: S.side.src.manual ? $('src').value : S.side.src.ip,
+      dst: S.side.dst.manual ? $('dst').value : S.side.dst.ip,
+      vmid: S.side.src.manual ? $('vmid').value : $('vmid_sel').value,
+      target_vmid: $('target_vmid').value,
+      mode: $('mode').value, staging: $('staging').value, dst_storage: $('dst_storage').value, identity: $('identity').value,
+      dry_run: $('dry_run').checked, no_start: $('no_start').checked, cleanup_src: $('cleanup_src').checked,
+      destroy_src: $('destroy_src').checked
+    };
+  }
+
+  function syncButton() {
+    var dry = $('dry_run').checked;
+    $('go').textContent = dry ? 'Simula' : ($('destroy_src').checked ? 'Migra ed elimina l\'origine' : 'Avvia migrazione');
+    $('go').className = dry ? 'primary' : 'danger';
+  }
+
+  // CT scelto nell'elenco (null con l'inserimento a mano o se non c'e')
+  function selectedCt() {
+    if (S.side.src.manual) return null;
+    return S.srcVms.filter(function (x) { return String(x.vmid) === $('vmid_sel').value; })[0] || null;
+  }
+
+  // l'eliminazione dell'origine e "Non avviare" si escludono a vicenda; se il CT e' spento
+  // in origine non verrebbe avviato e lo script rifiuta l'eliminazione (non si puo' verificare)
+  function stoppedCtWithDestroy() {
+    var v = selectedCt();
+    return !!(v && $('destroy_src').checked && v.status !== 'running');
+  }
+
+  function syncOptions() {
+    var ns = $('no_start'), ds = $('destroy_src');
+    if (ds.checked) ns.checked = false;
+    ns.disabled = ds.checked;
+    ds.disabled = ns.checked;
+    $('destroy_hint').textContent = ns.checked
+      ? 'Disattivato: con «Non avviare» la destinazione non viene avviata e non si può verificare.'
+      : (stoppedCtWithDestroy() ? 'Il CT è spento in origine: sulla destinazione non verrebbe avviato e non si può verificare, quindi non lo si può eliminare da qui. Togli la spunta (e semmai eliminalo a mano dopo i controlli).' : '');
+    var id = currentVmid(), vm = id ? escapeHtml(id) : '&lt;vmid&gt;';
+    var html;
+    if (ds.checked) {
+      html = 'A fine migrazione, <b>solo se</b> il CT sulla destinazione risulta avviato e acceso, il CT sull\'origine viene <b>ELIMINATO</b> (<code>pct destroy ' + vm + ' --purge</code>). Altrimenti resta spento con onboot=0 e marcato come migrato (<code>lock: migrate</code>).';
+    } else {
+      html = 'A fine migrazione il CT sull\'origine resta <b>spento</b> con onboot=0 e viene marcato in automatico come migrato (<code>lock: migrate</code>). Dopo le verifiche, sul nodo di origine: <code>pct unlock ' + vm + ' &amp;&amp; pct destroy ' + vm + ' --purge</code>.';
+    }
+    $('endNote').innerHTML = html;
+    syncButton();
+  }
+
+  // ---- cluster, nodi e container a tendina (dati dalle API di PegaProx, con i permessi di chi usa la pagina)
+  var S = {
+    clusters: [],
+    side: {
+      src: { manual: false, cluster: '', node: '', ip: '', seq: 0 },
+      dst: { manual: false, cluster: '', node: '', ip: '', seq: 0 }
+    },
+    vms: {},          // cluster -> promessa dell'elenco guest
+    srcVms: [],       // gli LXC del nodo di origine
+    dstVmids: null,   // VMID usati nel cluster di destinazione (null = non noto)
+    blocked: false    // manca il permesso plugins.manage
+  };
+
+  function rest(path) {
+    return fetch('/api/' + path, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) {
+        return r.text().then(function (t) {
+          var d = null;
+          try { d = JSON.parse(t); } catch (e) { /* non JSON */ }
+          if (!r.ok) {
+            var err = new Error((d && (d.error || d.message)) || ('HTTP ' + r.status));
+            err.status = r.status;
+            throw err;
+          }
+          return d;
+        });
+      });
+  }
+
+  function setOptions(sel, items, placeholder) {
+    sel.innerHTML = '';
+    var o = document.createElement('option');
+    o.value = ''; o.textContent = placeholder;
+    sel.appendChild(o);
+    items.forEach(function (it) {
+      var op = document.createElement('option');
+      op.value = it.value; op.textContent = it.label;
+      if (it.disabled) op.disabled = true;
+      sel.appendChild(op);
+    });
+  }
+
+  function setHint(id, text, warn) {
+    var el = $(id);
+    el.textContent = text || '';
+    el.className = 'hint' + (warn ? ' warnText' : '');
+  }
+
+  function setManual(side, on, forced) {
+    S.side[side].manual = on;
+    $(side + 'Drop').hidden = on;
+    $(side + 'Man').hidden = !on;
+    $(side + 'Toggle').textContent = on ? 'Scegli da cluster e nodi' : 'Inserisci a mano';
+    $(side + 'Toggle').hidden = !!forced;
+    checkVmidHint();
+    syncOptions();
+  }
+
+  function getVms(cluster) {
+    if (!S.vms[cluster]) {
+      S.vms[cluster] = rest('clusters/' + encodeURIComponent(cluster) + '/vms').then(function (d) {
+        return (d && Array.isArray(d.vms)) ? d.vms : [];
+      });
+      S.vms[cluster].catch(function () { delete S.vms[cluster]; });
+    }
+    return S.vms[cluster];
+  }
+
+  function currentVmid() {
+    return S.side.src.manual ? $('vmid').value.trim() : $('vmid_sel').value;
+  }
+
+  function checkVmidHint() {
+    var t = $('target_vmid').value.trim() || currentVmid();
+    var used = !S.side.dst.manual && S.dstVmids && t && S.dstVmids.has(t);
+    $('dst_hint').textContent = used ? 'Il VMID ' + t + ' è già in uso nel cluster di destinazione: indica un altro VMID qui sopra.' : '';
+  }
+
+  function clearCts() {
+    S.srcVms = [];
+    setOptions($('vmid_sel'), [], S.side.src.node ? 'Carico i container...' : '— scegli prima il nodo —');
+    setHint('vm_hint', '');
+    syncOptions();
+  }
+
+  function refreshDstClusters() {
+    var keep = $('dst_cluster').value;
+    var items = S.clusters.filter(function (c) { return c.id !== S.side.src.cluster; })
+      .map(function (c) { return { value: c.id, label: c.label }; });
+    setOptions($('dst_cluster'), items, items.length ? '— scegli il cluster —' : 'Nessun altro cluster: inserisci a mano');
+    if (keep && items.some(function (i) { return i.value === keep; })) $('dst_cluster').value = keep;
+    else if (keep) onCluster('dst');
+  }
+
+  function onCluster(side) {
+    var st = S.side[side];
+    st.cluster = $(side + '_cluster').value;
+    st.node = ''; st.ip = ''; st.seq++;
+    var seq = st.seq, nodeSel = $(side + '_node');
+    setHint(side + '_ip', '');
+    if (side === 'src') { clearCts(); refreshDstClusters(); }
+    else { S.dstVmids = null; checkVmidHint(); }
+    if (!st.cluster) { setOptions(nodeSel, [], '— scegli prima il cluster —'); return; }
+    setOptions(nodeSel, [], 'Carico i nodi...');
+    if (side === 'dst') {
+      var cl = st.cluster;
+      getVms(cl).then(function (vms) {
+        if (st.cluster !== cl) return;
+        S.dstVmids = new Set(vms.map(function (v) { return String(v.vmid); }));
+        checkVmidHint();
+      }).catch(function () { /* il controllo del VMID e' solo un avviso */ });
+    }
+    rest('clusters/' + encodeURIComponent(st.cluster) + '/nodes').then(function (d) {
+      if (seq !== st.seq) return;
+      var nodes = (Array.isArray(d) ? d : (d && Array.isArray(d.nodes) ? d.nodes : [])).filter(function (n) { return n && n.node; });
+      var live = function (n) { return !n.status || n.status === 'online'; };
+      setOptions(nodeSel, nodes.map(function (n) {
+        return { value: n.node, label: n.node + (live(n) ? '' : ' (' + n.status + ')'), disabled: !live(n) };
+      }), nodes.length ? '— scegli il nodo —' : 'Nessun nodo');
+      var online = nodes.filter(live);
+      if (online.length === 1) { nodeSel.value = online[0].node; onNode(side); }
+    }).catch(function (e) {
+      if (seq !== st.seq) return;
+      setOptions(nodeSel, [], 'Nodi non disponibili');
+      setHint(side + '_ip', 'Errore: ' + e.message, true);
+    });
+  }
+
+  function onNode(side) {
+    var st = S.side[side];
+    st.node = $(side + '_node').value; st.ip = ''; st.seq++;
+    var seq = st.seq;
+    setHint(side + '_ip', '');
+    if (side === 'src') clearCts();
+    if (!st.node) return;
+    setHint(side + '_ip', 'Cerco l\'indirizzo del nodo...');
+    rest('clusters/' + encodeURIComponent(st.cluster) + '/nodes/' + encodeURIComponent(st.node) + '/ip').then(function (d) {
+      if (seq !== st.seq) return;
+      st.ip = d && d.ip ? String(d.ip) : '';
+      var fb = !!(d && /fallback/.test(d.source || ''));
+      if (!st.ip) setHint(side + '_ip', 'Indirizzo non disponibile: usa "Inserisci a mano".', true);
+      else if (fb) setHint(side + '_ip', 'SSH verso ' + st.ip + ' — attenzione: PegaProx non conosce l\'IP di questo nodo e ha usato l\'host del cluster. Verifica che sia quello giusto.', true);
+      else setHint(side + '_ip', 'SSH verso ' + st.ip);
+    }).catch(function (e) {
+      if (seq !== st.seq) return;
+      setHint(side + '_ip', 'Indirizzo non disponibile (' + e.message + '): usa "Inserisci a mano".', true);
+    });
+    if (side === 'src') {
+      getVms(st.cluster).then(function (vms) {
+        if (seq !== st.seq) return;
+        S.srcVms = vms.filter(function (v) { return v.type === 'lxc' && v.node === st.node; });
+        setOptions($('vmid_sel'), S.srcVms.map(function (v) {
+          return { value: String(v.vmid), label: v.vmid + ' · ' + (v.name || '-') + ' · ' + (v.status || '?') };
+        }), S.srcVms.length ? '— scegli il container —' : 'Nessun container LXC su questo nodo');
+      }).catch(function (e) {
+        if (seq !== st.seq) return;
+        setOptions($('vmid_sel'), [], 'Elenco non disponibile');
+        setHint('vm_hint', 'Elenco dei container non disponibile (' + e.message + '): usa "Inserisci a mano".', true);
+      });
+    }
+  }
+
+  function onCt() {
+    var v = S.srcVms.filter(function (x) { return String(x.vmid) === $('vmid_sel').value; })[0];
+    setHint('vm_hint', !v ? '' : (v.status === 'running' ? 'Il CT è acceso: verrà spento durante la migrazione.' : 'Il CT è ' + (v.status || 'spento') + '.'));
+    checkVmidHint();
+    syncOptions();
+  }
+
+  // errori di scelta (solo con le tendine): messaggi piu' chiari della validazione generica
+  function selectionError() {
+    var out = '';
+    ['src', 'dst'].forEach(function (side) {
+      var st = S.side[side];
+      if (out || st.manual) return;
+      var nome = side === 'src' ? 'di origine' : 'di destinazione';
+      if (!st.cluster) out = 'Scegli il cluster ' + nome + '.';
+      else if (!st.node) out = 'Scegli il nodo ' + nome + '.';
+      else if (!st.ip) out = 'Indirizzo del nodo ' + nome + ' non disponibile: usa "Inserisci a mano".';
+    });
+    if (!out && !S.side.src.manual && !$('vmid_sel').value) out = 'Scegli il container da migrare.';
+    if (!out && stoppedCtWithDestroy()) out = 'Il CT è spento in origine: non si può eliminare da qui (sulla destinazione non verrebbe avviato). Togli «Elimina il CT sull\'origine».';
+    return out;
+  }
+
+  function sideLabel(side) {
+    var st = S.side[side];
+    if (st.manual) return $(side).value.trim();
+    var c = S.clusters.filter(function (x) { return x.id === st.cluster; })[0];
+    return (c ? c.label + ' / ' : '') + st.node + ' (' + st.ip + ')';
+  }
+
+  function ctLabel() {
+    var id = currentVmid();
+    var v = S.side.src.manual ? null : S.srcVms.filter(function (x) { return String(x.vmid) === id; })[0];
+    return id + (v && v.name ? ' (' + v.name + ')' : '');
+  }
+
+  function loadClusters() {
+    return rest('clusters').then(function (list) {
+      if (!Array.isArray(list)) throw new Error('risposta inattesa');
+      S.clusters = list.filter(function (c) { return c && c.id && (!c.cluster_type || c.cluster_type === 'proxmox'); })
+        .map(function (c) { return { id: String(c.id), label: (c.display_name || c.name || String(c.id)) + (c.connected === false ? ' (non connesso)' : '') }; });
+      if (!S.clusters.length) throw new Error('nessun cluster Proxmox disponibile');
+      setOptions($('src_cluster'), S.clusters.map(function (c) { return { value: c.id, label: c.label }; }), '— scegli il cluster —');
+      refreshDstClusters();
+      // la tab si apre dentro un cluster (?cluster=<id>): e' il cluster di origine piu' probabile
+      var here = qs.get('cluster');
+      if (here && S.clusters.some(function (c) { return c.id === here; })) {
+        $('src_cluster').value = here;
+        onCluster('src');
+      }
+    }).catch(function (e) {
+      setManual('src', true, true); setManual('dst', true, true);
+      show($('banner'), 'Elenco dei cluster non disponibile (' + e.message + '): inserisci i nodi a mano.', 'warn');
+    });
+  }
+
+  function syncGo() {
+    $('go').disabled = running || S.blocked;
+  }
+
+  // ---- lavori e log
+  var current = null, pollTimer = null, running = false;
+
+  function fmt(t) { return t ? String(t).replace('T', ' ') : '-'; }
+
+  function renderLog(job) {
+    var el = $('log');
+    var nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    el.innerHTML = ansiToHtml((job.log || []).join('\n')) || '(nessun output)';
+    if (nearBottom) el.scrollTop = el.scrollHeight;
+    $('meta').innerHTML = '<span>Lavoro <code>' + escapeHtml(job.id) + '</code></span>' +
+      '<span class="badge ' + escapeHtml(job.status) + '">' + escapeHtml(job.status) + '</span>' +
+      '<span>avvio ' + escapeHtml(fmt(job.created_at)) + '</span>' +
+      (job.user ? '<span>da ' + escapeHtml(job.user) + '</span>' : '') +
+      (job.finished_at ? '<span>fine ' + escapeHtml(fmt(job.finished_at)) + '</span>' : '') +
+      (job.rc != null ? '<span>codice ' + escapeHtml(job.rc) + '</span>' : '');
+  }
+
+  function poll() {
+    clearTimeout(pollTimer);
+    if (!current) return;
+    var id = current;
+    api('job?id=' + encodeURIComponent(id)).then(function (job) {
+      if (id !== current) return;
+      renderLog(job);
+      running = job.status === 'running';
+      syncGo();
+      $('goHint').textContent = running ? 'Un lavoro è in corso.' : '';
+      if (running) pollTimer = setTimeout(poll, POLL_MS); else loadJobs();
+    }).catch(function (e) {
+      show($('formMsg'), 'Lettura del log non riuscita: ' + e.message, 'err');
+      pollTimer = setTimeout(poll, POLL_MS * 4);
+    });
+  }
+
+  function openJob(id) {
+    current = id;
+    $('log').textContent = 'Carico il log...';
+    poll();
+    markSelected();
+  }
+
+  function markSelected() {
+    Array.prototype.forEach.call(document.querySelectorAll('tr.job'), function (tr) {
+      tr.classList.toggle('sel', tr.getAttribute('data-id') === current);
+    });
+  }
+
+  function loadJobs() {
+    return api('jobs').then(function (d) {
+      var jobs = (d && d.jobs) || [];
+      var tb = $('jobs');
+      if (!jobs.length) { tb.innerHTML = '<tr><td colspan="6" class="hint">Nessun lavoro.</td></tr>'; return jobs; }
+      tb.innerHTML = jobs.map(function (j) {
+        return '<tr class="job" data-id="' + escapeHtml(j.id) + '"><td><code>' + escapeHtml(j.id) + '</code></td>' +
+          '<td><span class="badge ' + escapeHtml(j.status) + '">' + escapeHtml(j.status) + '</span></td>' +
+          '<td>' + escapeHtml(j.user || '-') + '</td>' +
+          '<td>' + escapeHtml(fmt(j.created_at)) + '</td><td>' + escapeHtml(fmt(j.finished_at)) + '</td>' +
+          '<td>' + escapeHtml(j.rc == null ? '-' : j.rc) + '</td></tr>';
+      }).join('');
+      Array.prototype.forEach.call(tb.querySelectorAll('tr.job'), function (tr) {
+        tr.addEventListener('click', function () { openJob(tr.getAttribute('data-id')); });
+      });
+      markSelected();
+      return jobs;
+    }).catch(function (e) {
+      if (e.code === 'MISSING_PERMISSION') {
+        S.blocked = true; syncGo();
+        show($('banner'), 'Per usare questo plugin serve il permesso plugins.manage. Chiedi a un amministratore di PegaProx.', 'err');
+      }
+      $('jobs').innerHTML = '<tr><td colspan="6" class="hint">Elenco non disponibile: ' + escapeHtml(e.message) + '</td></tr>';
+      return [];
+    });
+  }
+
+  // ---- avvio
+  $('dry_run').addEventListener('change', syncButton);
+  ['no_start', 'destroy_src'].forEach(function (id) { $(id).addEventListener('change', syncOptions); });
+
+  $('form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var sel = selectionError();
+    if (sel) { show($('formMsg'), sel, 'err'); return; }
+    var p = buildPayload(values());
+    var err = validate(p);
+    if (err) { show($('formMsg'), err, 'err'); return; }
+    if (!p.dry_run && p.destroy_src) {
+      var typed = window.prompt('ATTENZIONE: migrare il CT ' + ctLabel() + '\nda ' + sideLabel('src') + '\na ' + sideLabel('dst') + '\n\n' +
+        'Se il CT si avvia correttamente sulla destinazione, il CT sull\'origine verrà ELIMINATO (pct destroy --purge).\n' +
+        'Il backup resta come rete di sicurezza.\n\nScrivi il VMID ' + p.vmid + ' per confermare:');
+      if (typed === null || typed.trim() !== p.vmid) {
+        show($('formMsg'), 'Conferma non valida: migrazione non avviata.', 'err');
+        return;
+      }
+    } else if (!p.dry_run) {
+      var q = 'Migrare il CT ' + ctLabel() + '\nda ' + sideLabel('src') + '\na ' + sideLabel('dst') + '?\n\n' +
+        'Il CT sull\'origine verrà spento (se acceso), salvato e ripristinato sulla destinazione.\n' +
+        'Sull\'origine resterà spento e marcato come migrato (lock: migrate): va eliminato a mano dopo le verifiche.';
+      if (!window.confirm(q)) return;
+    }
+    show($('formMsg'), '');
+    saveKept();
+    $('go').disabled = true;
+    api('run', p).then(function (d) {
+      show($('formMsg'), p.dry_run ? 'Simulazione avviata.' : 'Migrazione avviata.', 'ok');
+      return loadJobs().then(function () { openJob(d.job_id); });
+    }).catch(function (e) {
+      syncGo();
+      show($('formMsg'), 'Avvio non riuscito: ' + e.message, 'err');
+    });
+  });
+
+  // ---- chiave SSH
+  $('showKey').addEventListener('click', function () {
+    show($('sshMsg'), '');
+    api('ssh-key').then(function (d) {
+      $('pubkey').hidden = false; $('copyRow').hidden = false;
+      $('pubkey').value = d.public_key || '';
+    }).catch(function (e) { show($('sshMsg'), 'Chiave non disponibile: ' + e.message, 'err'); });
+  });
+  $('copyKey').addEventListener('click', function () {
+    $('pubkey').select();
+    var done = function () { show($('sshMsg'), 'Chiave copiata.', 'ok'); };
+    var fail = function () { show($('sshMsg'), 'Copia non riuscita: seleziona il testo e copialo a mano.', 'err'); };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText($('pubkey').value).then(done, fail);
+      else if (document.execCommand('copy')) done(); else fail();
+    } catch (e) { fail(); }
+  });
+  $('ik_go').addEventListener('click', function () {
+    var host = $('ik_host').value.trim(), user = $('ik_user').value.trim() || 'root', pw = $('ik_pw').value;
+    if (!host || !pw) { show($('sshMsg'), 'Servono nodo e password.', 'err'); return; }
+    if (/^-/.test(host) || /\s/.test(host) || /^-/.test(user) || /\s/.test(user)) { show($('sshMsg'), 'Nodo o utente non validi.', 'err'); return; }
+    $('ik_go').disabled = true;
+    api('install-ssh-key', { host: host, user: user, password: pw }).then(function () {
+      show($('sshMsg'), 'Chiave installata su ' + host + '.', 'ok');
+    }).catch(function (e) {
+      show($('sshMsg'), 'Installazione non riuscita: ' + e.message, 'err');
+    }).then(function () { $('ik_pw').value = ''; $('ik_go').disabled = false; });
+  });
+
+  // ---- tendine: eventi
+  $('src_cluster').addEventListener('change', function () { onCluster('src'); });
+  $('src_node').addEventListener('change', function () { onNode('src'); });
+  $('vmid_sel').addEventListener('change', onCt);
+  $('dst_cluster').addEventListener('change', function () { onCluster('dst'); });
+  $('dst_node').addEventListener('change', function () { onNode('dst'); });
+  $('target_vmid').addEventListener('input', checkVmidHint);
+  $('vmid').addEventListener('input', function () { checkVmidHint(); syncOptions(); });
+  $('srcToggle').addEventListener('click', function () { setManual('src', !S.side.src.manual); });
+  $('dstToggle').addEventListener('click', function () { setManual('dst', !S.side.dst.manual); });
+
+  // ---- avvio pagina
+  loadKept();
+  syncOptions();
+  loadClusters();
+  loadJobs().then(function (jobs) {
+    var live = jobs.filter(function (j) { return j.status === 'running'; })[0] || jobs[0];
+    if (live) openJob(live.id);
+  });
+  setInterval(function () { if (!running) loadJobs(); }, LIST_MS);
+
+  // per i test
+  window.__xm = { ansiToHtml: ansiToHtml, buildPayload: buildPayload, validate: validate, escapeHtml: escapeHtml };
+})();
+</script>
+</body>
+</html>

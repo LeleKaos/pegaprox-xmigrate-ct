@@ -1,0 +1,48 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  script-e-installer:
+    name: script e installer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: sintassi
+        run: |
+          bash -n install.sh
+          bash -n plugin/xmigrate_ct/xmigrate-ct.sh
+      - name: xmigrate-ct.sh contro nodi Proxmox simulati
+        run: python3 tests/test_script.py
+      - name: install.sh su una finta installazione di PegaProx
+        run: python3 tests/test_install.py
+
+  plugin:
+    name: plugin (API)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install flask requests
+      - run: python tests/test_server.py
+
+  e2e:
+    name: pagina (browser)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r tests/requirements.txt
+      - run: playwright install --with-deps chromium
+      - name: prove nel browser
+        run: |
+          python tests/e2e.py
+          python tests/e2e_dropdown.py
+          python tests/e2e_destroy.py
+          python tests/e2e_preselect.py

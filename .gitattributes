@@ -1,0 +1,3 @@
+# fine riga LF ovunque: uno script .sh con CRLF non parte
+* text=auto eol=lf
+*.png binary

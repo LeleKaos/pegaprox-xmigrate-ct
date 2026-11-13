@@ -1,0 +1,4 @@
+# solo per i test del plugin (test_server.py e i test e2e); gli altri test non hanno dipendenze Python
+flask
+requests
+playwright
