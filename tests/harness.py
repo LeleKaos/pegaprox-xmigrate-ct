@@ -5,6 +5,9 @@ from flask import Flask, jsonify, request, Response
 from werkzeug.serving import make_server
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# build() cambia HOME (per isolare la chiave SSH del plugin): senza questa riga Playwright
+# cercherebbe i browser nella nuova HOME invece che in quella vera
+os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', os.path.join(os.path.expanduser('~'), '.cache', 'ms-playwright'))
 PLUGIN_DIR = os.environ.get('XM_NEW') or os.path.join(HERE, '..', 'plugin', 'xmigrate_ct')
 STUB = os.path.join(HERE, 'stub.sh')
 
